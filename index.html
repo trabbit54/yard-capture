@@ -145,6 +145,29 @@ input[type=file]{display:none}
 }
 .reasons button:active{border-color:var(--hi)}
 
+/* ---------- inspection form ---------- */
+.isec{
+  font-family:var(--cond);font-weight:600;font-size:21px;letter-spacing:.02em;
+  color:var(--hi);margin:26px 0 4px;padding-bottom:7px;border-bottom:1px solid var(--line);
+}
+.q{margin:17px 0}
+.q label{display:block;font-size:16px;font-weight:600;margin-bottom:9px;line-height:1.3}
+.need{color:var(--stop);font-style:normal;margin-right:6px}
+.opts{display:flex;flex-wrap:wrap;gap:7px}
+.opt{
+  padding:11px 14px;border:1px solid var(--line);border-radius:7px;
+  background:var(--panel);font-size:14.5px;line-height:1.25;text-align:left;
+}
+.opt.on{background:var(--hi);color:#15171B;border-color:var(--hi);font-weight:600}
+.q input,.q textarea{
+  width:100%;padding:14px;font:inherit;font-size:16px;
+  background:var(--panel);color:var(--text);
+  border:1px solid var(--line);border-radius:7px;
+}
+.q input:focus,.q textarea:focus{outline:2px solid var(--hi);outline-offset:1px}
+.q textarea{resize:vertical}
+.shoot:disabled{cursor:default}
+
 /* ---------- done ---------- */
 .done{padding:26px 18px;text-align:center}
 .done h1{font-size:clamp(34px,10vw,46px)}
@@ -242,6 +265,14 @@ const T = {
     soft:"Out of focus",
     sharpHint:"Detail holds up when a buyer zooms in",
     softHint:"Hold still, tap the screen to focus, try again",
+    clear:"Nothing covering the lens",
+    clearHint:"Full view of the unit",
+    covered:"Something is covering part of the lens",
+    coveredHint:"Check your finger, a strap, or your sleeve — move it and shoot again",
+    noHands:"No hands or people in the shot",
+    noHandsHint:"Just the unit",
+    hands:"Looks like a hand or person in the shot",
+    handsHint:"Step out of the frame and shoot again",
     light:"Well lit",
     dark:"Too dark",
     bright:"Blown out",
@@ -252,9 +283,6 @@ const T = {
     cut:"Looks cut off at the edge",
     frameHint:"Nothing running off the side of the picture",
     cutHint:"Step back until you can see daylight around the whole unit",
-    people:"No hands or people",
-    peopleWait:"Checked after upload",
-    peopleHint:"Runs on our end — you'll hear back if it needs a redo",
     pass:"Looks good. Next shot.",
     fail:"Retake this one — see above.",
     doneTitle:"Sent",
@@ -266,6 +294,11 @@ const T = {
     missing:"MISSING",
     tip:"Nothing uploads at reduced size. What the camera captured is what gets sent.",
     pick:"Choose an existing photo",
+    send:"SEND TO BAS",
+    inspectStep:"LAST STEP",
+    inspectTitle:"What did you find?",
+    inspectHow:"Answer what you can. \u201cCouldn\u2019t check\u201d is a real answer — a blank tells us nothing.",
+    inspectSum:"Inspection",
     noCam:"Camera didn't open. Use \u201cChoose an existing photo\u201d \u2014 this page needs to be opened directly in your browser, not inside another app."
   },
   es:{
@@ -287,6 +320,14 @@ const T = {
     soft:"Fuera de foco",
     sharpHint:"El detalle aguanta cuando el comprador amplía",
     softHint:"No mueva el teléfono, toque la pantalla para enfocar",
+    clear:"Nada tapa el lente",
+    clearHint:"Se ve la unidad completa",
+    covered:"Algo está tapando parte del lente",
+    coveredHint:"Revise su dedo, una correa o la manga — quítelo y repita",
+    noHands:"Sin manos ni personas en la foto",
+    noHandsHint:"Solo la unidad",
+    hands:"Parece que hay una mano o persona en la foto",
+    handsHint:"Salga del cuadro y repita la foto",
     light:"Bien iluminada",
     dark:"Muy oscura",
     bright:"Muy clara",
@@ -297,9 +338,6 @@ const T = {
     cut:"Se ve cortada en el borde",
     frameHint:"Nada se sale del borde de la foto",
     cutHint:"Retroceda hasta ver espacio alrededor de toda la unidad",
-    people:"Sin manos ni personas",
-    peopleWait:"Se revisa después de enviar",
-    peopleHint:"Lo revisamos nosotros — le avisamos si hay que repetirla",
     pass:"Bien. Siguiente foto.",
     fail:"Repita esta foto — vea arriba.",
     doneTitle:"Enviado",
@@ -311,6 +349,11 @@ const T = {
     missing:"FALTA",
     tip:"Nada se envía reducido. Lo que capturó la cámara es lo que se manda.",
     pick:"Elegir una foto existente",
+    send:"ENVIAR A BAS",
+    inspectStep:"ÚLTIMO PASO",
+    inspectTitle:"¿Qué encontró?",
+    inspectHow:"Conteste lo que pueda. \u201cNo se pudo revisar\u201d es una respuesta válida — dejarlo en blanco no nos dice nada.",
+    inspectSum:"Inspección",
     noCam:"La cámara no abrió. Use \u201cElegir una foto existente\u201d \u2014 esta página debe abrirse directamente en el navegador, no dentro de otra app."
   }
 };
@@ -403,12 +446,17 @@ const ART = {
    The ORIGINAL file is what gets uploaded, never the canvas.
    ============================================================ */
 const MIN_MP = 3.0;          // below this a listing photo looks soft
-const BLUR_FLOOR = 55;       // laplacian variance
+const TILE_SHARP = 45;       // per-tile laplacian variance to count as in focus
+const SHARP_SHARE = 0.42;    // share of tiles that must be sharp
 const DARK = 52, BRIGHT = 212;
-const EDGE_BLEED = 0.30;     // share of border pixels with strong gradient
+const EDGE_BLEED = 0.30;
+const BLOB_SHARE = 0.055;    // share of frame covered by an obstruction
+const SKIN_SHARE = 0.030;    // share of frame that looks like skin
+
+const GX = 8, GY = 6;        // analysis grid
 
 function analyse(img){
-  const W = 480, H = Math.max(1, Math.round(img.naturalHeight / img.naturalWidth * W));
+  const W = 560, H = Math.max(1, Math.round(img.naturalHeight / img.naturalWidth * W));
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d", {willReadFrequently:true});
@@ -416,25 +464,77 @@ function analyse(img){
   const px = ctx.getImageData(0, 0, W, H).data;
 
   const g = new Float32Array(W*H);
-  let sum = 0;
+  const skin = new Uint8Array(W*H);
+  let sum = 0, skinCount = 0;
+
   for(let i=0, p=0; i<px.length; i+=4, p++){
-    const v = 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2];
+    const r=px[i], gr=px[i+1], b=px[i+2];
+    const v = 0.299*r + 0.587*gr + 0.114*b;
     g[p] = v; sum += v;
+
+    // YCbCr skin range — indicative only, biased, so warning not block
+    const cb = 128 - 0.168736*r - 0.331264*gr + 0.5*b;
+    const cr = 128 + 0.5*r - 0.418688*gr - 0.081312*b;
+    if(cb>=77 && cb<=130 && cr>=134 && cr<=180 && r>60 && r>b){
+      skin[p]=1; skinCount++;
+    }
   }
   const mean = sum/(W*H);
 
-  // laplacian variance -> focus
-  let ls=0, lss=0, n=0;
-  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
-    const p=y*W+x;
-    const l = 4*g[p]-g[p-1]-g[p+1]-g[p-W]-g[p+W];
-    ls+=l; lss+=l*l; n++;
+  // ---- per-tile focus. A finger over the lens is a soft patch inside an
+  // otherwise sharp frame, and a global average hides it completely.
+  const tw = Math.floor(W/GX), th = Math.floor(H/GY);
+  const tile = [];
+  for(let ty=0; ty<GY; ty++){
+    for(let tx=0; tx<GX; tx++){
+      const x0=tx*tw, y0=ty*th, x1=Math.min(x0+tw,W-1), y1=Math.min(y0+th,H-1);
+      let ls=0, lss=0, n=0, sk=0, tot=0;
+      for(let y=Math.max(y0,1); y<y1; y++){
+        for(let x=Math.max(x0,1); x<x1; x++){
+          const p=y*W+x;
+          const l = 4*g[p]-g[p-1]-g[p+1]-g[p-W]-g[p+W];
+          ls+=l; lss+=l*l; n++;
+          sk+=skin[p]; tot++;
+        }
+      }
+      const v = n ? (lss/n - (ls/n)**2) : 0;
+      tile.push({tx,ty,v,sharp:v>=TILE_SHARP,skin:tot?sk/tot:0,
+                 edge: tx===0||ty===0||tx===GX-1||ty===GY-1});
+    }
   }
-  const focus = lss/n - (ls/n)**2;
 
-  // sobel magnitude -> where are the edges
-  const edge = new Float32Array(W*H);
+  const sharpShare = tile.filter(t=>t.sharp).length / tile.length;
+
+  // ---- obstruction: a run of soft tiles anchored to a frame edge, while the
+  // rest of the picture is in focus. That is a thumb, a strap, a coat.
+  const soft = tile.filter(t=>!t.sharp);
+  const at = (tx,ty)=> tile[ty*GX+tx];
+  const seen = new Set();
+  let blob = 0, blobEdge = false, blobSkin = 0;
+  for(const t of soft){
+    const key = t.ty*GX+t.tx;
+    if(seen.has(key)) continue;
+    const stack=[t]; seen.add(key);
+    let size=0, touches=false, sk=0;
+    while(stack.length){
+      const cur = stack.pop();
+      size++; sk += cur.skin;
+      if(cur.edge) touches = true;
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=cur.tx+dx, ny=cur.ty+dy;
+        if(nx<0||ny<0||nx>=GX||ny>=GY) continue;
+        const nb = at(nx,ny), k = ny*GX+nx;
+        if(!nb.sharp && !seen.has(k)){ seen.add(k); stack.push(nb); }
+      }
+    }
+    if(size > blob){ blob = size; blobEdge = touches; blobSkin = sk/size; }
+  }
+  const blobShare = blob / tile.length;
+  const obstructed = blobEdge && blobShare >= BLOB_SHARE && sharpShare > 0.45;
+
+  // ---- sobel bleed for cut-off
   let emax = 1;
+  const edge = new Float32Array(W*H);
   for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
     const p=y*W+x;
     const gx = -g[p-W-1]-2*g[p-1]-g[p+W-1] + g[p-W+1]+2*g[p+1]+g[p+W+1];
@@ -442,7 +542,6 @@ function analyse(img){
     const m = Math.hypot(gx,gy);
     edge[p]=m; if(m>emax) emax=m;
   }
-  // strong edges sitting on the frame border suggest the subject runs off
   const band = Math.max(2, Math.round(H*0.022));
   const thr = emax*0.30;
   let hot=0, tot=0;
@@ -451,18 +550,211 @@ function analyse(img){
   for(let y=0;y<H;y++) for(let b=0;b<band;b++){ touch(b,y); touch(W-1-b,y); }
   const bleed = hot/Math.max(tot,1);
 
+  // ---- skin near an edge suggests a hand held in the shot
+  let edgeSkin = 0, edgeTot = 0;
+  const eb = Math.round(H*0.16);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    if(y<eb||y>H-1-eb||x<eb||x>W-1-eb){ edgeSkin += skin[y*W+x]; edgeTot++; }
+  }
+  const skinShare = skinCount/(W*H);
+  const skinEdgeShare = edgeTot ? edgeSkin/edgeTot : 0;
+  const handLikely = skinShare >= SKIN_SHARE && skinEdgeShare > skinShare*1.15;
+
   const mp = img.naturalWidth*img.naturalHeight/1e6;
   return {
     w:img.naturalWidth, h:img.naturalHeight,
     mp:mp.toFixed(1), mpRaw:mp,
-    focus, mean, bleed
+    sharpShare, mean, bleed,
+    obstructed, blobShare, blobSkin,
+    handLikely, skinShare
   };
+}
+
+
+/* ============================================================
+   Inspection — controlled vocabulary, never a free-text box where
+   a picklist will do. "Couldn't check" is always a valid answer;
+   a blank field tells the appraiser nothing.
+   ============================================================ */
+const NOTE = { en:"Add a note (optional)", es:"Agregar nota (opcional)" };
+
+const INSPECT = [
+{ sec:{en:"Starting and running",es:"Arranque y funcionamiento"}, items:[
+  { id:"starts", req:true,
+    en:"Does it start?", es:"¿Arranca?",
+    opts:[["Starts on the key","Arranca con la llave"],["Needed a jump","Necesitó puente"],
+          ["Cranks, won't start","Da marcha, no arranca"],["No power at all","Sin energía"],
+          ["Didn't try","No se intentó"]] },
+  { id:"lights", req:true, multi:true,
+    en:"Warning lights on the dash", es:"Luces de advertencia en el tablero",
+    opts:[["None showing","Ninguna"],["Check engine","Motor"],["DEF / emissions","DEF / emisiones"],
+          ["Oil pressure","Presión de aceite"],["Coolant temp","Temperatura"],
+          ["ABS / brakes","ABS / frenos"],["Air pressure","Presión de aire"],
+          ["Couldn't check","No se pudo revisar"]] },
+  { id:"odo", req:true, num:true,
+    en:"Odometer reading", es:"Lectura del odómetro",
+    ph:{en:"e.g. 497379",es:"ej. 497379"} },
+  { id:"vin", req:true, text:true,
+    en:"VIN, as printed on the plate", es:"VIN, como aparece en la placa",
+    ph:{en:"17 characters",es:"17 caracteres"} }
+]},
+{ sec:{en:"Engine",es:"Motor"}, items:[
+  { id:"engmake", req:true, text:true,
+    en:"Engine make and model, from the tag", es:"Marca y modelo del motor, de la placa",
+    ph:{en:"e.g. PACCAR MX-13",es:"ej. PACCAR MX-13"} },
+  { id:"trans", req:true,
+    en:"Transmission", es:"Transmisión",
+    opts:[["Automatic — no clutch pedal","Automática — sin pedal de embrague"],
+          ["Manual — has a clutch pedal","Manual — con pedal de embrague"],
+          ["Couldn't tell","No se pudo determinar"]] },
+  { id:"oil",
+    en:"Oil on the dipstick", es:"Aceite en la varilla",
+    opts:[["Full and clean","Lleno y limpio"],["Full but dark","Lleno pero oscuro"],
+          ["Low","Bajo"],["Milky or foamy","Lechoso o espumoso"],["Couldn't check","No se pudo revisar"]] },
+  { id:"leaks", multi:true,
+    en:"Leaks you can see", es:"Fugas visibles",
+    opts:[["None","Ninguna"],["Oil","Aceite"],["Coolant","Refrigerante"],["Fuel","Combustible"],
+          ["Hydraulic","Hidráulica"],["Couldn't check","No se pudo revisar"]] }
+]},
+{ sec:{en:"Outside",es:"Exterior"}, items:[
+  { id:"body", req:true,
+    en:"Body and paint", es:"Carrocería y pintura",
+    opts:[["No damage observed","Sin daños observados"],["Normal work wear","Desgaste normal de trabajo"],
+          ["See notes — damage","Ver notas — daños"],["Obstructed","Obstruido"]] },
+  { id:"glass",
+    en:"Glass", es:"Vidrios",
+    opts:[["All good","Todos bien"],["Chipped","Astillado"],["Cracked","Estrellado"],
+          ["Broken or missing","Roto o faltante"]] },
+  { id:"tires", req:true,
+    en:"Tire tread, worst position", es:"Banda de las llantas, la peor",
+    opts:[["Good — over half","Buena — más de la mitad"],["Fair — about half","Regular — mitad"],
+          ["Poor — nearly bald","Mala — casi lisa"],["Flat or missing","Ponchada o faltante"],
+          ["Couldn't check","No se pudo revisar"]] },
+  { id:"mismatch",
+    en:"Are the tires mismatched?", es:"¿Las llantas son diferentes entre sí?",
+    opts:[["All the same","Todas iguales"],["Mixed brands or tread","Marcas o dibujos mezclados"],
+          ["Couldn't check","No se pudo revisar"]] }
+]},
+{ sec:{en:"Inside the cab",es:"Interior de la cabina"}, items:[
+  { id:"seat",
+    en:"Seat", es:"Asiento",
+    opts:[["Good","Bueno"],["Worn","Desgastado"],["Torn","Roto"],["Missing","Faltante"]] },
+  { id:"interior",
+    en:"Interior overall", es:"Interior en general",
+    opts:[["No damage observed","Sin daños observados"],["Normal work wear","Desgaste normal"],
+          ["See notes","Ver notas"],["Obstructed","Obstruido"]] },
+  { id:"ac",
+    en:"Does the A/C blow cold?", es:"¿El aire acondicionado enfría?",
+    opts:[["Yes","Sí"],["Blows, not cold","Sopla, no enfría"],["No","No"],["Didn't try","No se intentó"]] }
+]},
+{ sec:{en:"Body and equipment",es:"Caja y equipo"}, items:[
+  { id:"bed",
+    en:"Dump body condition", es:"Condición de la caja",
+    opts:[["No damage observed","Sin daños observados"],["Dented but sound","Abollada pero firme"],
+          ["Cracked or holed","Agrietada o perforada"],["Not applicable","No aplica"]] },
+  { id:"hoist", req:true,
+    en:"Does the bed raise and lower?", es:"¿La caja sube y baja?",
+    opts:[["Yes, full cycle","Sí, ciclo completo"],["Raises but slow or weak","Sube lento o débil"],
+          ["No","No"],["Didn't try","No se intentó"],["Not applicable","No aplica"]] },
+  { id:"gate",
+    en:"Does the tailgate work?", es:"¿Funciona la compuerta?",
+    opts:[["Yes","Sí"],["Sticks","Se atora"],["No","No"],["Didn't try","No se intentó"],
+          ["Not applicable","No aplica"]] }
+]},
+{ sec:{en:"Anything else",es:"Algo más"}, items:[
+  { id:"capture",
+    en:"Anything that got in the way of this inspection?", es:"¿Algo que dificultó esta inspección?",
+    opts:[["Nothing","Nada"],["Unit was dead, had to jump it","Estaba muerta, hubo que darle puente"],
+          ["Parked too tight for good photos","Muy apretada para buenas fotos"],
+          ["Weather","Clima"],["Couldn't open something","No se pudo abrir algo"],
+          ["Other — see notes","Otra — ver notas"]] },
+  { id:"final", text:true, long:true,
+    en:"Notes for the appraiser", es:"Notas para el evaluador",
+    ph:{en:"Anything a buyer would want to know",es:"Algo que un comprador querría saber"} }
+]}
+];
+
+const answers = {};
+
+function inspectDone(){
+  return INSPECT.every(g => g.items.every(it =>
+    !it.req || (answers[it.id] && String(answers[it.id]).trim() !== "" &&
+                (!it.multi || answers[it.id].length))));
+}
+
+function renderInspect(){
+  dock.style.display = "block";
+  $("#shoot").textContent = t("send");
+  $("#shoot").disabled = !inspectDone();
+  $("#shoot").style.opacity = inspectDone() ? "1" : ".45";
+  $("#skip").style.display = "none";
+  $("#pick").style.display = "none";
+
+  main.innerHTML = `
+    <div class="count">${t("inspectStep")}</div>
+    <h1>${t("inspectTitle")}</h1>
+    <p class="how">${t("inspectHow")}</p>
+    ${INSPECT.map(g=>`
+      <div class="isec">${g.sec[lang]}</div>
+      ${g.items.map(it=>renderItem(it)).join("")}
+    `).join("")}
+    <div style="height:8px"></div>`;
+  wireInspect();
+  drawTicks();
+}
+
+function renderItem(it){
+  const label = it[lang];
+  const need = it.req ? `<i class="need">•</i>` : "";
+  if(it.text || it.num){
+    const v = answers[it.id] || "";
+    return `<div class="q"><label for="f_${it.id}">${need}${label}</label>
+      ${it.long
+        ? `<textarea id="f_${it.id}" data-id="${it.id}" rows="3" placeholder="${it.ph[lang]}">${v}</textarea>`
+        : `<input id="f_${it.id}" data-id="${it.id}" type="${it.num?"number":"text"}"
+             inputmode="${it.num?"numeric":"text"}" placeholder="${it.ph[lang]}" value="${v}">`}
+    </div>`;
+  }
+  const cur = answers[it.id] || (it.multi ? [] : null);
+  const opts = it.opts.map((o,i)=>{
+    const txt = lang==="en" ? o[0] : o[1];
+    const on = it.multi ? cur.includes(i) : cur===i;
+    return `<button class="opt${on?" on":""}" data-id="${it.id}" data-i="${i}"
+              data-multi="${it.multi?1:0}">${txt}</button>`;
+  }).join("");
+  return `<div class="q"><label>${need}${label}</label><div class="opts">${opts}</div></div>`;
+}
+
+function wireInspect(){
+  main.querySelectorAll(".opt").forEach(b=>{
+    b.onclick = ()=>{
+      const id=b.dataset.id, i=+b.dataset.i, multi=b.dataset.multi==="1";
+      if(multi){
+        const cur = answers[id] || [];
+        answers[id] = cur.includes(i) ? cur.filter(x=>x!==i) : [...cur, i];
+      } else {
+        answers[id] = answers[id]===i ? null : i;
+      }
+      const scroll = main.scrollTop;
+      renderInspect();
+      main.scrollTop = scroll;
+    };
+  });
+  main.querySelectorAll("input,textarea").forEach(f=>{
+    f.oninput = ()=>{
+      answers[f.dataset.id] = f.value;
+      const ok = inspectDone();
+      $("#shoot").disabled = !ok;
+      $("#shoot").style.opacity = ok ? "1" : ".45";
+    };
+  });
 }
 
 /* ============================================================
    State
    ============================================================ */
 let lang = "en";
+let phase = "photos";
 let idx = 0;
 const results = {};   // id -> {url, meta} | {skipped, reason}
 let pending = null;
@@ -474,6 +766,8 @@ const review=$("#review"), skipsheet=$("#skipsheet"), cam=$("#cam");
 function t(k, ...a){ const v=T[lang][k]; return typeof v==="function"?v(...a):v; }
 
 function drawTicks(){
+  const last = phase==="done" ? "tick done"
+             : phase==="inspect" ? "tick now" : "tick";
   ticksEl.innerHTML = SHOTS.map((s,i)=>{
     const r = results[s.id];
     let cls = "tick";
@@ -481,11 +775,13 @@ function drawTicks(){
     else if(r) cls += " done";
     else if(i===idx) cls += " now";
     return `<div class="${cls}"></div>`;
-  }).join("");
+  }).join("") + `<div class="${last}" style="flex:.6"></div>`;
 }
 
 function render(){
-  if(idx >= SHOTS.length){ finish(); return; }
+  if(phase === "inspect"){ renderInspect(); return; }
+  if(phase === "done"){ finish(); return; }
+  if(idx >= SHOTS.length){ phase = "inspect"; renderInspect(); return; }
   const s = SHOTS[idx];
   const [title, how] = s[lang];
   main.innerHTML = `
@@ -496,7 +792,10 @@ function render(){
     <figure>${ART[s.art]||""}</figure>
   `;
   $("#shoot").textContent = t("shoot");
+  $("#shoot").disabled = false;
+  $("#shoot").style.opacity = "1";
   $("#skip").textContent = t("skip");
+  $("#pick").style.display = "block";
   $("#skip").style.display = s.must ? "block" : "none";
   $("#pick").textContent = t("pick");
   main.scrollTop = 0;
@@ -504,7 +803,10 @@ function render(){
 }
 
 /* ---------- capture ---------- */
-$("#shoot").onclick = ()=> cam.click();
+$("#shoot").onclick = ()=>{
+  if(phase === "inspect"){ if(inspectDone()){ phase="done"; finish(); } return; }
+  cam.click();
+};
 
 function handleFile(e){
   const file = e.target.files && e.target.files[0];
@@ -535,8 +837,14 @@ function showReview(img, m){
   const resOk = m.mpRaw >= MIN_MP;
   row(resOk?"ok":"no", resOk?t("resOk",m):t("resLow",m), resOk?t("resHint"):t("resLowHint"));
 
-  const sharp = m.focus >= BLUR_FLOOR;
+  const sharp = m.sharpShare >= SHARP_SHARE;
   row(sharp?"ok":"no", sharp?t("sharp"):t("soft"), sharp?t("sharpHint"):t("softHint"));
+
+  row(m.obstructed?"no":"ok", m.obstructed?t("covered"):t("clear"),
+      m.obstructed?t("coveredHint"):t("clearHint"));
+
+  row(m.handLikely?"hm":"ok", m.handLikely?t("hands"):t("noHands"),
+      m.handLikely?t("handsHint"):t("noHandsHint"));
 
   const dark = m.mean < DARK, blown = m.mean > BRIGHT;
   row(dark||blown?"hm":"ok", dark?t("dark"):blown?t("bright"):t("light"),
@@ -545,11 +853,9 @@ function showReview(img, m){
   const framed = m.bleed < EDGE_BLEED;
   row(framed?"ok":"hm", framed?t("frame"):t("cut"), framed?t("frameHint"):t("cutHint"));
 
-  row("wait", t("people"), t("peopleHint"));
-
   $("#checks").innerHTML = rows.join("");
 
-  const blocked = !resOk || !sharp;
+  const blocked = !resOk || !sharp || m.obstructed;
   const v = $("#verdict");
   v.className = "verdict " + (blocked ? "fail" : "pass");
   v.textContent = blocked ? t("fail") : t("pass");
@@ -614,11 +920,28 @@ function finish(){
       <div class="stat"><span>${t("sSkipped")}</span><b>${skipped.length}</b></div>
       <div class="stat"><span>${t("sSize")}</span><b>${low} MP</b></div>
       <div class="stat"><span>${t("sAvg")}</span><b>${avg} MP</b></div>
+      <div class="isec" style="margin-top:22px">${t("inspectSum")}</div>
+      ${summarise()}
       <p class="sub">${t("doneSub")}</p>
       <p class="sub">${t("tip")}</p>
     </div>`;
   dock.style.display = "none";
   drawTicks();
+}
+
+function summarise(){
+  const out = [];
+  INSPECT.forEach(g => g.items.forEach(it => {
+    const a = answers[it.id];
+    if(a === undefined || a === null || a === "" || (Array.isArray(a) && !a.length)) return;
+    let v;
+    if(it.opts) v = Array.isArray(a)
+        ? a.map(i=>lang==="en"?it.opts[i][0]:it.opts[i][1]).join(", ")
+        : (lang==="en"?it.opts[a][0]:it.opts[a][1]);
+    else v = a;
+    out.push(`<div class="stat"><span>${it[lang]}</span><b style="font-size:14px;font-family:var(--sans);text-align:right;max-width:58%">${v}</b></div>`);
+  }));
+  return out.join("");
 }
 
 /* ---------- language ---------- */
@@ -627,7 +950,7 @@ function setLang(l){
   $("#en").setAttribute("aria-pressed", l==="en");
   $("#es").setAttribute("aria-pressed", l==="es");
   document.documentElement.lang = l;
-  if(idx >= SHOTS.length) finish(); else render();
+  render();
 }
 $("#en").onclick = ()=> setLang("en");
 $("#es").onclick = ()=> setLang("es");
