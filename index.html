@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Yard Capture — Job 22028</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#15171B;
+  --panel:#1E2127;
+  --panel2:#262A31;
+  --line:#343941;
+  --hi:#F2C230;
+  --go:#54B87F;
+  --stop:#E2504F;
+  --warn:#E8913C;
+  --text:#EEF0F2;
+  --dim:#949BA5;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --cond:"Barlow Condensed",Impact,var(--sans);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  background:var(--ink);color:var(--text);font-family:var(--sans);
+  font-size:16px;line-height:1.45;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+  display:flex;flex-direction:column;overscroll-behavior:none;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+/* ---------- header ---------- */
+header{
+  border-bottom:1px solid var(--line);padding:10px 16px 9px;
+  display:flex;align-items:center;gap:12px;flex:none;
+}
+.job{flex:1;min-width:0}
+.job b{
+  font-family:var(--cond);font-weight:700;font-size:15px;
+  letter-spacing:.04em;color:var(--hi);display:block;line-height:1.1;
+}
+.job span{
+  display:block;font-size:13px;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.lang{display:flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex:none}
+.lang button{padding:6px 11px;font-size:12px;font-weight:600;color:var(--dim)}
+.lang button[aria-pressed="true"]{background:var(--hi);color:#15171B}
+
+/* ---------- progress ---------- */
+.ticks{display:flex;gap:3px;padding:9px 16px;flex:none}
+.tick{height:5px;flex:1;background:var(--panel2);border-radius:1px;transition:background .2s}
+.tick.done{background:var(--go)}
+.tick.skip{background:var(--warn)}
+.tick.now{background:var(--hi)}
+
+/* ---------- main ---------- */
+main{flex:1;overflow-y:auto;padding:4px 16px 16px;-webkit-overflow-scrolling:touch}
+.count{font-size:12px;color:var(--dim);letter-spacing:.09em;font-weight:600}
+h1{
+  font-family:var(--cond);font-weight:600;
+  font-size:clamp(38px,11vw,52px);line-height:.94;
+  margin:6px 0 10px;letter-spacing:-.005em;
+}
+.how{font-size:16px;color:#C8CDD4;margin:0 0 14px;max-width:34em}
+.req{
+  display:inline-flex;align-items:center;gap:7px;font-size:12.5px;
+  font-weight:600;padding:4px 10px;border-radius:4px;margin-bottom:16px;
+}
+.req.must{background:rgba(226,80,79,.13);color:#F08C8B}
+.req.opt{background:var(--panel2);color:var(--dim)}
+
+figure{
+  margin:0 0 20px;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;padding:16px;
+}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-size:12.5px;color:var(--dim);margin-top:10px}
+
+/* ---------- capture ---------- */
+.dock{
+  padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);background:var(--panel);flex:none;
+}
+.shoot{
+  width:100%;background:var(--hi);color:#15171B;
+  font-family:var(--cond);font-weight:700;font-size:25px;letter-spacing:.03em;
+  padding:19px;border-radius:9px;
+}
+.shoot:active{transform:scale(.988)}
+.minor{
+  width:100%;padding:13px;margin-top:9px;font-size:14.5px;
+  color:var(--dim);border:1px solid var(--line);border-radius:8px;
+}
+input[type=file]{display:none}
+
+/* ---------- review ---------- */
+.sheet{
+  position:fixed;inset:0;background:var(--ink);z-index:20;
+  display:none;flex-direction:column;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+}
+.sheet.on{display:flex}
+.shot-wrap{
+  flex:1;min-height:0;background:#0C0E11;
+  display:flex;align-items:center;justify-content:center;padding:14px;
+}
+.shot-wrap img{max-width:100%;max-height:100%;border-radius:7px;object-fit:contain}
+.checks{padding:14px 16px 4px;flex:none}
+.chk{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px;
+}
+.chk:last-child{border-bottom:0}
+.dot{
+  width:19px;height:19px;border-radius:50%;flex:none;margin-top:1px;
+  display:grid;place-items:center;font-size:12px;font-weight:700;color:#15171B;
+}
+.dot.ok{background:var(--go)}
+.dot.no{background:var(--stop);color:#fff}
+.dot.hm{background:var(--warn)}
+.dot.wait{background:var(--panel2);color:var(--dim)}
+.chk b{font-weight:600;display:block}
+.chk small{color:var(--dim);font-size:12.5px;display:block;margin-top:1px}
+.verdict{
+  margin:12px 16px 0;padding:13px 15px;border-radius:8px;
+  font-size:14.5px;font-weight:600;
+}
+.verdict.pass{background:rgba(84,184,127,.13);color:#87D6A9}
+.verdict.fail{background:rgba(226,80,79,.13);color:#F08C8B}
+.acts{display:flex;gap:10px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+.acts button{flex:1;padding:16px;border-radius:8px;font-weight:600;font-size:16px}
+.keep{background:var(--go);color:#0E1A13}
+.keep[disabled]{background:var(--panel2);color:#5D646E}
+.again{border:1px solid var(--line);color:var(--text)}
+
+/* ---------- skip ---------- */
+.reasons{padding:0 16px}
+.reasons button{
+  width:100%;text-align:left;padding:16px 15px;margin-bottom:9px;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;font-size:15.5px;
+}
+.reasons button:active{border-color:var(--hi)}
+
+/* ---------- done ---------- */
+.done{padding:26px 18px;text-align:center}
+.done h1{font-size:clamp(34px,10vw,46px)}
+.grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));
+  gap:7px;margin:20px 0;
+}
+.grid div{
+  position:relative;aspect-ratio:4/3;border-radius:6px;overflow:hidden;
+  background:var(--panel2);
+}
+.grid img{width:100%;height:100%;object-fit:cover}
+.grid span{
+  position:absolute;left:0;right:0;bottom:0;background:rgba(10,12,15,.82);
+  font-size:9.5px;padding:3px 4px;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.grid div.gap{display:grid;place-items:center;color:var(--warn);font-size:11px;padding:6px;text-align:center}
+.stat{
+  display:flex;justify-content:space-between;padding:11px 0;
+  border-bottom:1px solid var(--line);font-size:14.5px;
+}
+.stat span{color:var(--dim)}
+.stat b{font-family:var(--cond);font-size:19px;font-weight:600}
+.sub{color:var(--dim);font-size:14px;margin-top:20px;text-align:left}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="job">
+    <b id="jobno">JOB 22028</b>
+    <span id="jobdesc">2016 Kenworth T880 Dump · Hiram, GA</span>
+  </div>
+  <div class="lang">
+    <button id="en" aria-pressed="true">EN</button>
+    <button id="es" aria-pressed="false">ES</button>
+  </div>
+</header>
+
+<div class="ticks" id="ticks"></div>
+
+<main id="main"></main>
+
+<div class="dock" id="dock">
+  <button class="shoot" id="shoot"></button>
+  <button class="minor" id="skip"></button>
+  <button class="minor" id="pick"></button>
+  <input type="file" id="cam" accept="image/*" capture="environment">
+  <input type="file" id="lib" accept="image/*">
+</div>
+
+<!-- review -->
+<div class="sheet" id="review">
+  <div class="shot-wrap"><img id="preview" alt=""></div>
+  <div class="checks" id="checks"></div>
+  <div class="verdict" id="verdict"></div>
+  <div class="acts">
+    <button class="again" id="again"></button>
+    <button class="keep" id="keep"></button>
+  </div>
+</div>
+
+<!-- skip reasons -->
+<div class="sheet" id="skipsheet">
+  <main>
+    <div class="count" id="skiplabel"></div>
+    <h1 id="skiptitle"></h1>
+    <div class="reasons" id="reasons"></div>
+  </main>
+  <div class="acts"><button class="again" id="skipcancel"></button></div>
+</div>
+
+<script>
+/* ============================================================
+   i18n
+   ============================================================ */
+const T = {
+  en:{
+    shotOf:(a,b)=>`SHOT ${a} OF ${b}`,
+    must:"Required — can't submit without it",
+    opt:"Optional",
+    shoot:"TAKE PHOTO",
+    skip:"Can't get this shot",
+    keep:"Use it",
+    again:"Retake",
+    cancel:"Back",
+    why:"Why can't you get it?",
+    checking:"Checking…",
+    resOk:d=>`${d.w} × ${d.h} · ${d.mp} megapixels`,
+    resLow:d=>`Only ${d.w} × ${d.h} · ${d.mp} MP`,
+    resHint:"Good enough to sell from",
+    resLowHint:"Too small for a listing. Check the camera is set to full size.",
+    sharp:"Sharp",
+    soft:"Out of focus",
+    sharpHint:"Detail holds up when a buyer zooms in",
+    softHint:"Hold still, tap the screen to focus, try again",
+    light:"Well lit",
+    dark:"Too dark",
+    bright:"Blown out",
+    lightHint:"Detail visible in shadows and highlights",
+    darkHint:"Move into daylight or open the doors",
+    brightHint:"Put the sun behind you",
+    frame:"Whole unit in frame",
+    cut:"Looks cut off at the edge",
+    frameHint:"Nothing running off the side of the picture",
+    cutHint:"Step back until you can see daylight around the whole unit",
+    people:"No hands or people",
+    peopleWait:"Checked after upload",
+    peopleHint:"Runs on our end — you'll hear back if it needs a redo",
+    pass:"Looks good. Next shot.",
+    fail:"Retake this one — see above.",
+    doneTitle:"Sent",
+    doneSub:"You're finished with this unit. Anything that needs a redo will come back as a new link.",
+    sTotal:"Photos taken",
+    sSkipped:"Marked can't-get",
+    sSize:"Smallest photo",
+    sAvg:"Average size",
+    missing:"MISSING",
+    tip:"Nothing uploads at reduced size. What the camera captured is what gets sent.",
+    pick:"Choose an existing photo",
+    noCam:"Camera didn't open. Use \u201cChoose an existing photo\u201d \u2014 this page needs to be opened directly in your browser, not inside another app."
+  },
+  es:{
+    shotOf:(a,b)=>`FOTO ${a} DE ${b}`,
+    must:"Obligatoria — no se puede enviar sin ella",
+    opt:"Opcional",
+    shoot:"TOMAR FOTO",
+    skip:"No puedo tomar esta foto",
+    keep:"Usarla",
+    again:"Repetir",
+    cancel:"Atrás",
+    why:"¿Por qué no se puede?",
+    checking:"Revisando…",
+    resOk:d=>`${d.w} × ${d.h} · ${d.mp} megapíxeles`,
+    resLow:d=>`Solo ${d.w} × ${d.h} · ${d.mp} MP`,
+    resHint:"Suficiente calidad para vender",
+    resLowHint:"Muy pequeña para publicar. Revise que la cámara esté en tamaño completo.",
+    sharp:"Nítida",
+    soft:"Fuera de foco",
+    sharpHint:"El detalle aguanta cuando el comprador amplía",
+    softHint:"No mueva el teléfono, toque la pantalla para enfocar",
+    light:"Bien iluminada",
+    dark:"Muy oscura",
+    bright:"Muy clara",
+    lightHint:"Se ve detalle en sombras y luces",
+    darkHint:"Salga a la luz del día o abra las puertas",
+    brightHint:"Póngase con el sol a la espalda",
+    frame:"Unidad completa en la foto",
+    cut:"Se ve cortada en el borde",
+    frameHint:"Nada se sale del borde de la foto",
+    cutHint:"Retroceda hasta ver espacio alrededor de toda la unidad",
+    people:"Sin manos ni personas",
+    peopleWait:"Se revisa después de enviar",
+    peopleHint:"Lo revisamos nosotros — le avisamos si hay que repetirla",
+    pass:"Bien. Siguiente foto.",
+    fail:"Repita esta foto — vea arriba.",
+    doneTitle:"Enviado",
+    doneSub:"Terminó con esta unidad. Si algo hay que repetir, le llega un enlace nuevo.",
+    sTotal:"Fotos tomadas",
+    sSkipped:"Marcadas imposibles",
+    sSize:"Foto más pequeña",
+    sAvg:"Tamaño promedio",
+    missing:"FALTA",
+    tip:"Nada se envía reducido. Lo que capturó la cámara es lo que se manda.",
+    pick:"Elegir una foto existente",
+    noCam:"La cámara no abrió. Use \u201cElegir una foto existente\u201d \u2014 esta página debe abrirse directamente en el navegador, no dentro de otra app."
+  }
+};
+
+/* ============================================================
+   Shot list — Class 8 dump truck.
+   Ordered by walk path, not by value, so the operator moves
+   around the unit once. `must` marks hard-blocked shots.
+   ============================================================ */
+const SHOTS = [
+  { id:"fl", must:true,
+    en:["Front, driver side","Stand back at the corner so you get the front and the whole driver side in one shot."],
+    es:["Frente, lado del conductor","Párese en la esquina para captar el frente y todo el lado del conductor."],
+    art:"threequarter" },
+  { id:"side", must:true,
+    en:["Full side profile","Square to the side. All axles must be visible — this is how buyers count the configuration."],
+    es:["Perfil lateral completo","De frente al costado. Todos los ejes visibles — así cuenta la configuración el comprador."],
+    art:"side" },
+  { id:"fr", must:true,
+    en:["Front, passenger side","Same as the first shot, opposite corner."],
+    es:["Frente, lado del pasajero","Igual que la primera foto, esquina opuesta."],
+    art:"threequarter" },
+  { id:"rear", must:true,
+    en:["Rear","Straight on from behind. Tailgate and lights in frame."],
+    es:["Parte trasera","De frente desde atrás. Compuerta y luces en el cuadro."],
+    art:"rear" },
+  { id:"vin", must:true,
+    en:["VIN plate","Driver door jamb. Close enough that every character is readable."],
+    es:["Placa del VIN","Marco de la puerta del conductor. Que se lea cada carácter."],
+    art:"plate" },
+  { id:"odo", must:true,
+    en:["Odometer","Key on. The mileage number must be sharp — this is the single biggest thing buyers price on."],
+    es:["Odómetro","Llave encendida. El número debe verse nítido — es lo que más define el precio."],
+    art:"gauge" },
+  { id:"engtag", must:true,
+    en:["Engine tag","The plate on the engine block with the model and serial."],
+    es:["Placa del motor","La placa en el bloque con modelo y número de serie."],
+    art:"plate" },
+  { id:"transtag", must:true,
+    en:["Transmission tag","On the transmission housing. Worth thousands on the sale price."],
+    es:["Placa de la transmisión","En la caja de la transmisión. Vale miles en el precio de venta."],
+    art:"plate" },
+  { id:"dash", must:true,
+    en:["Dash, key on","Every warning light showing. Do not start it first."],
+    es:["Tablero, llave encendida","Todas las luces de advertencia visibles. No la arranque antes."],
+    art:"gauge" },
+  { id:"seat", must:false,
+    en:["Seat and interior","Show the wear honestly. Disclosed wear sells better than hidden wear."],
+    es:["Asiento e interior","Muestre el desgaste tal cual. Lo declarado se vende mejor que lo oculto."],
+    art:"interior" },
+  { id:"engine", must:true,
+    en:["Engine bay","Hood up, whole compartment. Any leaks or missing parts should be visible."],
+    es:["Compartimiento del motor","Capó arriba, todo el compartimiento. Fugas o piezas faltantes visibles."],
+    art:"engine" },
+  { id:"tire", must:true,
+    en:["Drive tires","Close on the tread. Get one photo per axle position if they differ."],
+    es:["Llantas de tracción","Cerca de la banda. Una foto por eje si son distintas."],
+    art:"tire" },
+  { id:"bed", must:true,
+    en:["Inside the bed","Climb up or shoot from the side. Floor and side walls."],
+    es:["Interior de la caja","Suba o tome desde el costado. Piso y paredes laterales."],
+    art:"bed" },
+  { id:"damage", must:false,
+    en:["Damage","Anything bent, cracked, leaking, or missing. Take as many as you need."],
+    es:["Daños","Todo lo doblado, roto, con fuga o faltante. Tome las que necesite."],
+    art:"warn" }
+];
+
+const SKIP_REASONS = {
+  en:["Can't see it — blocked or buried","Won't start","Part is missing","Locked and no key","Not safe to get to","Something else"],
+  es:["No se ve — bloqueado o enterrado","No arranca","La pieza no está","Cerrado y sin llave","No es seguro llegar","Otra cosa"]
+};
+
+/* line art per shot — a rough sketch beats a paragraph */
+const ART = {
+  side:`<svg viewBox="0 0 300 96"><g fill="none" stroke="#F2C230" stroke-width="2.2" stroke-linejoin="round"><path d="M28 66V38l16-12h26l8 12h6v28"/><path d="M84 66V32h150v34"/><path d="M234 34l14 6v26"/></g><g fill="none" stroke="#949BA5" stroke-width="2"><circle cx="52" cy="70" r="10"/><circle cx="150" cy="70" r="10"/><circle cx="180" cy="70" r="10"/><circle cx="212" cy="70" r="10"/></g><path d="M14 86h272" stroke="#343941" stroke-width="1.5" stroke-dasharray="4 4"/></svg>`,
+  threequarter:`<svg viewBox="0 0 300 96"><g fill="none" stroke="#F2C230" stroke-width="2.2" stroke-linejoin="round"><path d="M56 70V40l20-14h30l10 14h10v30z"/><path d="M126 70V36l96 8v26z"/></g><g fill="none" stroke="#949BA5" stroke-width="2"><circle cx="84" cy="72" r="11"/><circle cx="180" cy="74" r="11"/><circle cx="212" cy="74" r="11"/></g></svg>`,
+  rear:`<svg viewBox="0 0 300 96"><g fill="none" stroke="#F2C230" stroke-width="2.2"><rect x="96" y="20" width="108" height="48" rx="2"/><path d="M96 44h108"/></g><g fill="none" stroke="#949BA5" stroke-width="2"><circle cx="112" cy="76" r="9"/><circle cx="188" cy="76" r="9"/><circle cx="104" cy="30" r="4"/><circle cx="196" cy="30" r="4"/></g></svg>`,
+  plate:`<svg viewBox="0 0 300 96"><rect x="88" y="18" width="124" height="60" rx="3" fill="none" stroke="#F2C230" stroke-width="2.2"/><g stroke="#949BA5" stroke-width="3" stroke-linecap="round"><path d="M102 36h60M102 48h96M102 60h74"/></g></svg>`,
+  gauge:`<svg viewBox="0 0 300 96"><circle cx="150" cy="48" r="34" fill="none" stroke="#F2C230" stroke-width="2.2"/><rect x="120" y="54" width="60" height="17" rx="2" fill="none" stroke="#949BA5" stroke-width="2"/><g stroke="#949BA5" stroke-width="2.6" stroke-linecap="round"><path d="M129 62h4M137 62h4M145 62h4M153 62h4M161 62h4M169 62h4"/></g><path d="M150 48l17-13" stroke="#F2C230" stroke-width="2.6" stroke-linecap="round"/></svg>`,
+  interior:`<svg viewBox="0 0 300 96"><g fill="none" stroke="#F2C230" stroke-width="2.2" stroke-linejoin="round"><path d="M110 78V44c0-10 8-16 18-16h14c10 0 16 6 16 16v6"/><path d="M104 78h64v-14h-64z"/></g><path d="M186 30v48" stroke="#949BA5" stroke-width="2"/></svg>`,
+  engine:`<svg viewBox="0 0 300 96"><g fill="none" stroke="#F2C230" stroke-width="2.2" stroke-linejoin="round"><path d="M96 74V40h34V28h44v12h30v34z"/></g><g stroke="#949BA5" stroke-width="2.4" stroke-linecap="round"><path d="M110 52v14M126 52v14M142 52v14M158 52v14M174 52v14"/></g></svg>`,
+  tire:`<svg viewBox="0 0 300 96"><circle cx="150" cy="48" r="36" fill="none" stroke="#F2C230" stroke-width="2.2"/><circle cx="150" cy="48" r="15" fill="none" stroke="#949BA5" stroke-width="2"/><g stroke="#949BA5" stroke-width="2.4" stroke-linecap="round"><path d="M150 12v8M150 76v8M114 48h8M178 48h8M124 22l6 6M170 68l6 6M176 22l-6 6M130 68l-6 6"/></g></svg>`,
+  bed:`<svg viewBox="0 0 300 96"><g fill="none" stroke="#F2C230" stroke-width="2.2" stroke-linejoin="round"><path d="M74 74l22-46h108l22 46z"/></g><g stroke="#949BA5" stroke-width="2"><path d="M104 28v46M132 28v46M168 28v46M196 28v46"/></g></svg>`,
+  warn:`<svg viewBox="0 0 300 96"><path d="M150 20l38 58h-76z" fill="none" stroke="#E8913C" stroke-width="2.4" stroke-linejoin="round"/><path d="M150 42v16" stroke="#E8913C" stroke-width="3" stroke-linecap="round"/><circle cx="150" cy="67" r="2.4" fill="#E8913C"/></svg>`
+};
+
+/* ============================================================
+   Quality checks — run on a downscaled copy for speed.
+   The ORIGINAL file is what gets uploaded, never the canvas.
+   ============================================================ */
+const MIN_MP = 3.0;          // below this a listing photo looks soft
+const BLUR_FLOOR = 55;       // laplacian variance
+const DARK = 52, BRIGHT = 212;
+const EDGE_BLEED = 0.30;     // share of border pixels with strong gradient
+
+function analyse(img){
+  const W = 480, H = Math.max(1, Math.round(img.naturalHeight / img.naturalWidth * W));
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d", {willReadFrequently:true});
+  ctx.drawImage(img, 0, 0, W, H);
+  const px = ctx.getImageData(0, 0, W, H).data;
+
+  const g = new Float32Array(W*H);
+  let sum = 0;
+  for(let i=0, p=0; i<px.length; i+=4, p++){
+    const v = 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2];
+    g[p] = v; sum += v;
+  }
+  const mean = sum/(W*H);
+
+  // laplacian variance -> focus
+  let ls=0, lss=0, n=0;
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
+    const p=y*W+x;
+    const l = 4*g[p]-g[p-1]-g[p+1]-g[p-W]-g[p+W];
+    ls+=l; lss+=l*l; n++;
+  }
+  const focus = lss/n - (ls/n)**2;
+
+  // sobel magnitude -> where are the edges
+  const edge = new Float32Array(W*H);
+  let emax = 1;
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
+    const p=y*W+x;
+    const gx = -g[p-W-1]-2*g[p-1]-g[p+W-1] + g[p-W+1]+2*g[p+1]+g[p+W+1];
+    const gy = -g[p-W-1]-2*g[p-W]-g[p-W+1] + g[p+W-1]+2*g[p+W]+g[p+W+1];
+    const m = Math.hypot(gx,gy);
+    edge[p]=m; if(m>emax) emax=m;
+  }
+  // strong edges sitting on the frame border suggest the subject runs off
+  const band = Math.max(2, Math.round(H*0.022));
+  const thr = emax*0.30;
+  let hot=0, tot=0;
+  const touch=(x,y)=>{ if(edge[y*W+x]>thr) hot++; tot++; };
+  for(let x=0;x<W;x++) for(let b=0;b<band;b++){ touch(x,b); touch(x,H-1-b); }
+  for(let y=0;y<H;y++) for(let b=0;b<band;b++){ touch(b,y); touch(W-1-b,y); }
+  const bleed = hot/Math.max(tot,1);
+
+  const mp = img.naturalWidth*img.naturalHeight/1e6;
+  return {
+    w:img.naturalWidth, h:img.naturalHeight,
+    mp:mp.toFixed(1), mpRaw:mp,
+    focus, mean, bleed
+  };
+}
+
+/* ============================================================
+   State
+   ============================================================ */
+let lang = "en";
+let idx = 0;
+const results = {};   // id -> {url, meta} | {skipped, reason}
+let pending = null;
+
+const $ = s => document.querySelector(s);
+const main=$("#main"), dock=$("#dock"), ticksEl=$("#ticks");
+const review=$("#review"), skipsheet=$("#skipsheet"), cam=$("#cam");
+
+function t(k, ...a){ const v=T[lang][k]; return typeof v==="function"?v(...a):v; }
+
+function drawTicks(){
+  ticksEl.innerHTML = SHOTS.map((s,i)=>{
+    const r = results[s.id];
+    let cls = "tick";
+    if(r && r.skipped) cls += " skip";
+    else if(r) cls += " done";
+    else if(i===idx) cls += " now";
+    return `<div class="${cls}"></div>`;
+  }).join("");
+}
+
+function render(){
+  if(idx >= SHOTS.length){ finish(); return; }
+  const s = SHOTS[idx];
+  const [title, how] = s[lang];
+  main.innerHTML = `
+    <div class="count">${t("shotOf", idx+1, SHOTS.length)}</div>
+    <h1>${title}</h1>
+    <p class="how">${how}</p>
+    <div class="req ${s.must?"must":"opt"}">${s.must?"●":"○"} ${s.must?t("must"):t("opt")}</div>
+    <figure>${ART[s.art]||""}</figure>
+  `;
+  $("#shoot").textContent = t("shoot");
+  $("#skip").textContent = t("skip");
+  $("#skip").style.display = s.must ? "block" : "none";
+  $("#pick").textContent = t("pick");
+  main.scrollTop = 0;
+  drawTicks();
+}
+
+/* ---------- capture ---------- */
+$("#shoot").onclick = ()=> cam.click();
+
+function handleFile(e){
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = ()=>{
+    const meta = analyse(img);
+    meta.bytes = file.size;
+    pending = { url, file, meta };
+    showReview(img, meta);
+  };
+  img.src = url;
+}
+cam.onchange = handleFile;
+$("#lib").onchange = handleFile;
+$("#pick").onclick = ()=> $("#lib").click();
+
+function showReview(img, m){
+  $("#preview").src = m ? img.src : "";
+  const rows = [];
+  const row=(state,label,hint)=>rows.push(
+    `<div class="chk"><div class="dot ${state}">${state==="ok"?"✓":state==="no"?"✕":state==="hm"?"!":"…"}</div>
+     <div><b>${label}</b><small>${hint}</small></div></div>`);
+
+  const resOk = m.mpRaw >= MIN_MP;
+  row(resOk?"ok":"no", resOk?t("resOk",m):t("resLow",m), resOk?t("resHint"):t("resLowHint"));
+
+  const sharp = m.focus >= BLUR_FLOOR;
+  row(sharp?"ok":"no", sharp?t("sharp"):t("soft"), sharp?t("sharpHint"):t("softHint"));
+
+  const dark = m.mean < DARK, blown = m.mean > BRIGHT;
+  row(dark||blown?"hm":"ok", dark?t("dark"):blown?t("bright"):t("light"),
+      dark?t("darkHint"):blown?t("brightHint"):t("lightHint"));
+
+  const framed = m.bleed < EDGE_BLEED;
+  row(framed?"ok":"hm", framed?t("frame"):t("cut"), framed?t("frameHint"):t("cutHint"));
+
+  row("wait", t("people"), t("peopleHint"));
+
+  $("#checks").innerHTML = rows.join("");
+
+  const blocked = !resOk || !sharp;
+  const v = $("#verdict");
+  v.className = "verdict " + (blocked ? "fail" : "pass");
+  v.textContent = blocked ? t("fail") : t("pass");
+  $("#keep").disabled = blocked;
+  $("#keep").textContent = t("keep");
+  $("#again").textContent = t("again");
+  review.classList.add("on");
+}
+
+$("#keep").onclick = ()=>{
+  results[SHOTS[idx].id] = pending;
+  pending = null;
+  review.classList.remove("on");
+  idx++; render();
+};
+$("#again").onclick = ()=>{
+  if(pending) URL.revokeObjectURL(pending.url);
+  pending = null;
+  review.classList.remove("on");
+};
+
+/* ---------- skip ---------- */
+$("#skip").onclick = ()=>{
+  $("#skiplabel").textContent = t("shotOf", idx+1, SHOTS.length);
+  $("#skiptitle").textContent = t("why");
+  $("#reasons").innerHTML = SKIP_REASONS[lang]
+    .map((r,i)=>`<button data-i="${i}">${r}</button>`).join("");
+  $("#reasons").querySelectorAll("button").forEach(b=>{
+    b.onclick = ()=>{
+      results[SHOTS[idx].id] = { skipped:true, reason:SKIP_REASONS[lang][+b.dataset.i] };
+      skipsheet.classList.remove("on");
+      idx++; render();
+    };
+  });
+  $("#skipcancel").textContent = t("cancel");
+  skipsheet.classList.add("on");
+};
+$("#skipcancel").onclick = ()=> skipsheet.classList.remove("on");
+
+/* ---------- finish ---------- */
+function finish(){
+  const taken = Object.values(results).filter(r=>!r.skipped);
+  const skipped = Object.values(results).filter(r=>r.skipped);
+  const mps = taken.map(r=>r.meta.mpRaw);
+  const low = mps.length ? Math.min(...mps).toFixed(1) : "—";
+  const avg = mps.length ? (mps.reduce((a,b)=>a+b,0)/mps.length).toFixed(1) : "—";
+
+  const cells = SHOTS.map(s=>{
+    const r = results[s.id];
+    if(r && !r.skipped)
+      return `<div><img src="${r.url}" alt=""><span>${s[lang][0]}</span></div>`;
+    if(r && r.skipped)
+      return `<div class="gap">${r.reason}</div>`;
+    return `<div class="gap">${t("missing")}<br>${s[lang][0]}</div>`;
+  }).join("");
+
+  main.innerHTML = `
+    <div class="done">
+      <h1>${t("doneTitle")}</h1>
+      <div class="grid">${cells}</div>
+      <div class="stat"><span>${t("sTotal")}</span><b>${taken.length}</b></div>
+      <div class="stat"><span>${t("sSkipped")}</span><b>${skipped.length}</b></div>
+      <div class="stat"><span>${t("sSize")}</span><b>${low} MP</b></div>
+      <div class="stat"><span>${t("sAvg")}</span><b>${avg} MP</b></div>
+      <p class="sub">${t("doneSub")}</p>
+      <p class="sub">${t("tip")}</p>
+    </div>`;
+  dock.style.display = "none";
+  drawTicks();
+}
+
+/* ---------- language ---------- */
+function setLang(l){
+  lang = l;
+  $("#en").setAttribute("aria-pressed", l==="en");
+  $("#es").setAttribute("aria-pressed", l==="es");
+  document.documentElement.lang = l;
+  if(idx >= SHOTS.length) finish(); else render();
+}
+$("#en").onclick = ()=> setLang("en");
+$("#es").onclick = ()=> setLang("es");
+
+render();
+</script>
+</body>
+</html>
