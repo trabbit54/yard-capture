@@ -164,6 +164,8 @@ input[type=file]{display:none}
   <div class="acts"><button class="again" id="skipcancel"></button></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <script>
 /* ============================================================ i18n */
 const T = {
@@ -203,6 +205,10 @@ en:{
   handsHint:"Step out of the frame and shoot again",
   handsOk:"Hand check overridden",
   handsOkHint:"You confirmed there's no hand — logged with the photo",
+  handWait:"Checking for people…",
+  handWaitHint:"A moment",
+  handSkip:"Person check unavailable",
+  handSkipHint:"No signal for it — we'll check on our end after upload",
   light:"Well lit", dark:"Too dark", bright:"Blown out",
   lightHint:"Detail visible in shadows and highlights",
   darkHint:"Move into daylight or open the doors",
@@ -263,6 +269,10 @@ es:{
   handsHint:"Salga del cuadro y repita la foto",
   handsOk:"Revisión de mano anulada",
   handsOkHint:"Usted confirmó que no hay mano — queda registrado con la foto",
+  handWait:"Buscando personas…",
+  handWaitHint:"Un momento",
+  handSkip:"Revisión no disponible",
+  handSkipHint:"Sin señal para hacerla — la revisamos al recibir la foto",
   light:"Bien iluminada", dark:"Muy oscura", bright:"Muy clara",
   lightHint:"Se ve detalle en sombras y luces",
   darkHint:"Salga a la luz del día o abra las puertas",
@@ -402,7 +412,8 @@ warn:`<svg viewBox="0 0 300 96"><path d="M150 20l38 58h-76z" fill="none" stroke=
    ============================================================ */
 const MIN_MP = 3.0, TILE_SHARP = 45, SHARP_SHARE = 0.42;
 const DARK = 52, BRIGHT = 212, EDGE_BLEED = 0.30;
-const BLOB_SHARE = 0.055, SKIN_SHARE = 0.030;
+const BLOB_SHARE = 0.075;
+const SOFT_REL = 0.22;   // a tile is soft if far below the frame's own median
 const GX = 8, GY = 6;
 
 function analyse(img){
@@ -427,29 +438,37 @@ function analyse(img){
   const tw = Math.floor(W/GX), th = Math.floor(H/GY), tile = [];
   for(let ty=0;ty<GY;ty++)for(let tx=0;tx<GX;tx++){
     const x0=tx*tw,y0=ty*th,x1=Math.min(x0+tw,W-1),y1=Math.min(y0+th,H-1);
-    let ls=0,lss=0,n=0,sk=0,tot=0;
+    let ls=0,lss=0,n=0,sk=0,tot=0,lum=0;
     for(let y=Math.max(y0,1);y<y1;y++)for(let x=Math.max(x0,1);x<x1;x++){
       const p=y*W+x;
       const l=4*g[p]-g[p-1]-g[p+1]-g[p-W]-g[p+W];
-      ls+=l; lss+=l*l; n++; sk+=skin[p]; tot++;
+      ls+=l; lss+=l*l; n++; sk+=skin[p]; lum+=g[p]; tot++;
     }
     const v = n ? lss/n-(ls/n)**2 : 0;
-    tile.push({tx,ty,v,sharp:v>=TILE_SHARP,skin:tot?sk/tot:0,
+    tile.push({tx,ty,v,skin:tot?sk/tot:0,lum:tot?lum/tot:0,
                edge:tx===0||ty===0||tx===GX-1||ty===GY-1});
   }
+
+  // Judge focus against the picture's own median rather than a fixed number.
+  // A thumb has enough skin texture to clear an absolute threshold, but it is
+  // always far softer than the scene behind it.
+  const sortedV = tile.map(t=>t.v).sort((a,b)=>a-b);
+  const medV = sortedV[Math.floor(sortedV.length/2)];
+  const softCut = Math.max(TILE_SHARP, medV*SOFT_REL);
+  tile.forEach(t=> t.sharp = t.v >= softCut);
   const sharpShare = tile.filter(t=>t.sharp).length/tile.length;
 
   const at=(x,y)=>tile[y*GX+x];
   const seen = new Set();
-  let blob=0, blobEdge=false;
+  let blob=0, blobEdge=false, blobSkin=0, blobLum=0;
   for(const t of tile){
     if(t.sharp) continue;
     const key=t.ty*GX+t.tx;
     if(seen.has(key)) continue;
     const stack=[t]; seen.add(key);
-    let size=0, touches=false;
+    let size=0, touches=false, sk=0, lu=0;
     while(stack.length){
-      const cur=stack.pop(); size++;
+      const cur=stack.pop(); size++; sk+=cur.skin; lu+=cur.lum;
       if(cur.edge) touches=true;
       for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
         const nx=cur.tx+dx, ny=cur.ty+dy;
@@ -458,9 +477,17 @@ function analyse(img){
         if(!nb.sharp && !seen.has(k)){ seen.add(k); stack.push(nb); }
       }
     }
-    if(size>blob){ blob=size; blobEdge=touches; }
+    if(size>blob){ blob=size; blobEdge=touches; blobSkin=sk/size; blobLum=lu/size; }
   }
-  const obstructed = blobEdge && blob/tile.length >= BLOB_SHARE && sharpShare > 0.45;
+
+  // Sky and open pavement are also texture-free and also touch the frame edge,
+  // so softness alone is not enough. A thing covering the lens is either
+  // skin-coloured or a dark silhouette against a normally-lit scene.
+  const blobShare = blob/tile.length;
+  const blobIsSkin = blobSkin > 0.34;
+  const blobIsDark = blobLum < 58 && mean > 82;
+  const obstructed = blobEdge && blobShare >= BLOB_SHARE
+                     && sharpShare > 0.38 && (blobIsSkin || blobIsDark);
 
   let emax=1; const edge=new Float32Array(W*H);
   for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
@@ -476,17 +503,37 @@ function analyse(img){
   for(let y=0;y<H;y++)for(let b=0;b<band;b++){ touch(b,y); touch(W-1-b,y); }
   const bleed = hot/Math.max(tot,1);
 
-  let edgeSkin=0, edgeTot=0;
-  const eb=Math.round(H*0.16);
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-    if(y<eb||y>H-1-eb||x<eb||x>W-1-eb){ edgeSkin+=skin[y*W+x]; edgeTot++; }
-  }
-  const skinShare = skinCount/(W*H);
-  const handLikely = skinShare>=SKIN_SHARE && (edgeTot?edgeSkin/edgeTot:0) > skinShare*1.15;
-
   const mp = img.naturalWidth*img.naturalHeight/1e6;
   return {w:img.naturalWidth,h:img.naturalHeight,mp:mp.toFixed(1),mpRaw:mp,
-          sharpShare,mean,bleed,obstructed,handLikely,skinShare};
+          sharpShare,mean,bleed,obstructed,blobShare,blobSkin,blobLum};
+}
+
+/* ============================================================ person check
+   Colour alone cannot do this. Yellow machine paint and warm evening light on
+   a silver truck sit in the same YCbCr range as skin, which is what produced
+   the false positives on the CAT and the Honda. So this runs a real detector,
+   lazily, and degrades to "checked after upload" if it can't load.
+   ============================================================ */
+let detector = null, detectorState = "idle";
+
+async function loadDetector(){
+  if(detectorState === "ready" || detectorState === "loading") return;
+  if(typeof cocoSsd === "undefined"){ detectorState = "unavailable"; return; }
+  detectorState = "loading";
+  try{
+    detector = await cocoSsd.load({base:"lite_mobilenet_v2"});
+    detectorState = "ready";
+  }catch(e){
+    detectorState = "unavailable";
+  }
+}
+
+async function findPeople(img){
+  if(detectorState !== "ready") return null;
+  try{
+    const preds = await detector.detect(img, 8, 0.42);
+    return preds.filter(p => p.class === "person");
+  }catch(e){ return null; }
 }
 
 /* ============================================================ inspection */
@@ -663,11 +710,17 @@ function handleFile(e){
   if(!file) return;
   const url = URL.createObjectURL(file);
   const img = new Image();
-  img.onload = ()=>{
+  img.onload = async ()=>{
     const meta = analyse(img);
     meta.bytes = file.size;
+    meta.people = "pending";
     pending = {url, file, meta};
     handOverride = false;
+    showReview(url, meta);
+
+    const found = await findPeople(img);
+    if(!pending || pending.url !== url) return;     // moved on already
+    meta.people = found === null ? "unknown" : found.length;
     showReview(url, meta);
   };
   img.src = url;
@@ -691,10 +744,17 @@ function showReview(url, m){
   row(m.obstructed?"no":"ok", m.obstructed?t("covered"):t("clear"),
       m.obstructed?t("coveredHint"):t("clearHint"));
 
-  const handFail = m.handLikely && !handOverride;
-  row(handFail?"no":"ok",
-      m.handLikely ? (handOverride?t("handsOk"):t("hands")) : t("noHands"),
-      m.handLikely ? (handOverride?t("handsOkHint"):t("handsHint")) : t("noHandsHint"));
+  const pending_people = m.people === "pending";
+  const unknown_people = m.people === "unknown";
+  const sawPerson = typeof m.people === "number" && m.people > 0;
+  const handFail = sawPerson && !handOverride;
+
+  if(pending_people)      row("hm", t("handWait"), t("handWaitHint"));
+  else if(unknown_people) row("hm", t("handSkip"), t("handSkipHint"));
+  else if(sawPerson)      row(handOverride?"ok":"no",
+                              handOverride?t("handsOk"):t("hands"),
+                              handOverride?t("handsOkHint"):t("handsHint"));
+  else                    row("ok", t("noHands"), t("noHandsHint"));
 
   const dark = m.mean<DARK, blown = m.mean>BRIGHT;
   row(dark||blown?"hm":"ok", dark?t("dark"):blown?t("bright"):t("light"),
@@ -705,7 +765,7 @@ function showReview(url, m){
 
   $("#checks").innerHTML = rows.join("");
 
-  const blocked = !resOk || !sharp || m.obstructed || handFail;
+  const blocked = !resOk || !sharp || m.obstructed || handFail || pending_people;
   const v = $("#verdict");
   v.className = "verdict " + (blocked?"fail":"pass");
   v.textContent = blocked ? t("fail") : t("pass");
@@ -898,6 +958,7 @@ function setLang(l){
   document.documentElement.lang = l;
   render();
 }
+loadDetector();
 $("#en").onclick = ()=> setLang("en");
 $("#es").onclick = ()=> setLang("es");
 
